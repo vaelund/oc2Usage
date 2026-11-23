@@ -39,7 +39,8 @@ type Connection = Plugin.Context["integration"]["connection"];
 
 function logProvider(integrationID: string): UsageProvider {
   if (integrationID === "xai") return "grok";
-  if (integrationID === "opencode-go") return "go";
+  if (integrationID === "opencode-go" || integrationID === "opencode")
+    return "go";
   if (integrationID === "meta") return "meta";
   if (integrationID === "openai") return "openai";
   if (/^(zai|zhipuai)/.test(integrationID)) return "zai";
@@ -78,7 +79,7 @@ type ExtraHeaders =
 
 async function loadProvider(
   connection: Connection,
-  integrationID: string,
+  integrationIDs: string | readonly string[],
   url: string,
   parse: (status: number, body: unknown) => ProviderInfo,
   trigger: UsageTrigger,
@@ -86,6 +87,9 @@ async function loadProvider(
   extraHeaders?: ExtraHeaders,
   payg?: ProviderInfo,
 ): Promise<ProviderInfo> {
+  const candidates =
+    typeof integrationIDs === "string" ? [integrationIDs] : integrationIDs;
+  let integrationID = candidates[0] ?? "";
   const started = Date.now();
   const logHttp = (info: {
     status: string;
@@ -108,8 +112,17 @@ async function loadProvider(
   };
 
   try {
-    const active = await connection.active(integrationID);
-    const credential = active ? await connection.resolve(active) : undefined;
+    let credential: unknown;
+    let found = false;
+    for (const candidate of candidates) {
+      const active = await connection.active(candidate);
+      if (!active) continue;
+      integrationID = candidate;
+      credential = await connection.resolve(active);
+      found = true;
+      break;
+    }
+    if (!found) credential = undefined;
     if (payg && isApiKeyCredential(credential)) {
       // No request is made: API keys carry no subscription quota.
       logHttp({ status: "payg" });
@@ -289,7 +302,7 @@ async function setup(ctx: Plugin.Context) {
       ),
       loadProvider(
         connection,
-        "opencode-go",
+        ["opencode-go", "opencode"],
         GO_USAGE_URL,
         parseGo,
         trigger,
