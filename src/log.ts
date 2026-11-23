@@ -4,7 +4,8 @@ import { dirname } from "node:path";
 export type UsageTrigger = "rpc" | "rpc-refresh" | "turn-end";
 export type UsageLogKind = "query" | "http";
 export type UsageCached = "cache" | "inflight" | "fetch";
-export type UsageProvider = "grok" | "go" | "anthropic" | "meta" | "openai";
+export type UsageProvider =
+  "grok" | "go" | "zai" | "anthropic" | "meta" | "openai";
 
 export type UsageLogRecord = {
   ts: string;

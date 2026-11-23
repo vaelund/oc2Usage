@@ -13,6 +13,7 @@ claude 8/28%
 claude ▄/6d▅ 80/60%
 claude payg
 grok 6d▁ 60%
+zai 13/34/50%
 meta 2/0%
 meta payg
 openai 12/38%
@@ -28,6 +29,7 @@ The plugin reads credentials from OpenCode's own connections (`/connect`). There
 | Anthropic   | `anthropic` (OAuth or API key)      | 5h, week, per-model week (Fable/Sonnet/Opus), extra-usage month; the footer shows the session model's week while `/usage` shows all windows; API keys show `claude payg` |
 | Grok        | `xai`                               | weekly credits                                                                                                                                                           |
 | OpenCode Go | `opencode-go`                       | 5h, week, month                                                                                                                                                          |
+| Z.ai        | `zai` / `zhipuai` coding plans      | 5h, week, monthly MCP tools (`zai` → api.z.ai, `zhipuai` → open.bigmodel.cn)                                                                                             |
 | Meta        | `meta` (Model API key)              | 5h subscription prompts, week (subscription only; pay-as-you-go shows `meta payg`)                                                                                       |
 | OpenAI      | `openai` (ChatGPT OAuth or API key) | 5h, week Codex windows under the ChatGPT plan (classified by window length, so weekly-only plans show correctly); API keys show `openai payg`                            |
 
@@ -96,16 +98,19 @@ The plugin sends the matching connection token only to that provider's own API h
 - `https://api.anthropic.com/api/oauth/usage`
 - `https://cli-chat-proxy.grok.com/v1/billing?format=credits`
 - `https://opencode.ai/zen/go/v1/usage`
+- `https://api.z.ai/api/monitor/usage/quota/limit` (CN: `https://open.bigmodel.cn/…`)
 - `https://api.meta.ai/v1/responses`
 - `https://chatgpt.com/backend-api/wham/usage`
 
 Anthropic API keys (`/connect` key or `ANTHROPIC_API_KEY`) have no subscription quota, so no request is made and the footer shows `claude payg`. OpenAI API keys likewise skip the ChatGPT usage endpoint and show `openai payg`; pasted ChatGPT JWT access tokens are treated as OAuth.
 
+Z.ai sends the raw key in `Authorization` with no `Bearer` prefix, matching its monitoring API; the `zai-coding-plan`/`zai` connections use the global host and `zhipuai-coding-plan`/`zhipuai` use the CN host. `ZHIPU_API_KEY` / `ZAI_API_KEY` are used as a fallback when no connection is active.
+
 Meta has no quota endpoint: the plugin sends a minimal streaming probe (`muse-spark-1.3`, ~25 tokens) and reads only the `response.subscription_usage` SSE event — the same event Muse Code's `/usage` reads. The completion text is discarded and the response body is never logged. On pay-as-you-go keys there is no subscription event, so the footer shows `meta payg`.
 
 Requests send `User-Agent: usageTrackerWidget/0.3.1`.
 
-The Anthropic OAuth usage endpoint, the Grok billing endpoint, and the ChatGPT `wham/usage` endpoint are undocumented and may change. This plugin is not affiliated with Anthropic, xAI, OpenAI, Meta, or OpenCode.
+The Anthropic OAuth usage endpoint, the Grok billing endpoint, and the ChatGPT `wham/usage` endpoint are undocumented and may change. This plugin is not affiliated with Anthropic, xAI, OpenAI, Meta, Z.ai, or OpenCode.
 
 ## Compatibility
 

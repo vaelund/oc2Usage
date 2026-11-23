@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Z.ai GLM Coding Plan usage: 5h + weekly token windows and the monthly MCP tool allowance from `GET /api/monitor/usage/quota/limit` (api.z.ai for `zai*` connections, open.bigmodel.cn for `zhipuai*`; `ZHIPU_API_KEY`/`ZAI_API_KEY` fallback)
+
 ## 26.9.1
 
 - fix: sync package version from tag before npm publish (4b66297)

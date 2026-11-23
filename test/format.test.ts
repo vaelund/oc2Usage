@@ -67,6 +67,7 @@ const snap = {
   fetchedAt: new Date().toISOString(),
   grok,
   go,
+  zai: { status: "pending" },
   anthropic,
   meta: { status: "pending" },
   openai: { status: "pending" },

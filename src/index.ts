@@ -27,7 +27,11 @@ import {
   parseGrok,
   parseMeta,
   parseOpenAI,
+  parseZai,
   tokenFromCredential,
+  zaiQuotaUrl,
+  zaiRequestHeaders,
+  type ZaiPlatform,
 } from "./providers.ts";
 import { Usage } from "./rpc.ts";
 
@@ -38,8 +42,20 @@ function logProvider(integrationID: string): UsageProvider {
   if (integrationID === "opencode-go") return "go";
   if (integrationID === "meta") return "meta";
   if (integrationID === "openai") return "openai";
+  if (/^(zai|zhipuai)/.test(integrationID)) return "zai";
   return "anthropic";
 }
+
+/** Z.ai integrations in OpenCode, most specific first. */
+const ZAI_INTEGRATIONS: ReadonlyArray<{
+  id: string;
+  platform: ZaiPlatform;
+}> = [
+  { id: "zai-coding-plan", platform: "global" },
+  { id: "zai", platform: "global" },
+  { id: "zhipuai-coding-plan", platform: "cn" },
+  { id: "zhipuai", platform: "cn" },
+];
 
 async function bearer(
   connection: Connection,
@@ -127,6 +143,79 @@ async function loadProvider(
   }
 }
 
+/**
+ * Z.ai has several integration ids, and the platform host depends on which one
+ * is connected (`zai*` → api.z.ai, `zhipuai*` → open.bigmodel.cn). Try them in
+ * order, then fall back to the env keys the Z.ai integration itself uses.
+ */
+async function loadZaiProvider(
+  connection: Connection,
+  trigger: UsageTrigger,
+  signal?: AbortSignal,
+): Promise<ProviderInfo> {
+  const started = Date.now();
+  const logHttp = (info: {
+    status: string;
+    error?: string;
+    httpStatus?: number;
+    body?: unknown;
+  }) => {
+    void appendUsageLog({
+      ts: new Date().toISOString(),
+      kind: "http",
+      provider: "zai",
+      trigger,
+      httpStatus: info.httpStatus,
+      status: info.status,
+      error: info.error,
+      ms: Date.now() - started,
+      body: info.body === undefined ? undefined : truncateBody(info.body),
+    });
+  };
+
+  try {
+    let token: string | undefined;
+    let platform: ZaiPlatform = "global";
+    for (const candidate of ZAI_INTEGRATIONS) {
+      const active = await connection.active(candidate.id);
+      if (!active) continue;
+      const resolved = tokenFromCredential(await connection.resolve(active));
+      if (!resolved) continue;
+      token = resolved;
+      platform = candidate.platform;
+      break;
+    }
+    if (!token) {
+      token = process.env.ZHIPU_API_KEY ?? process.env.ZAI_API_KEY;
+      if (!token) {
+        logHttp({ status: "missing" });
+        return { status: "missing" };
+      }
+    }
+    const { status, body } = await fetchJson(
+      zaiQuotaUrl(platform),
+      token,
+      signal,
+      zaiRequestHeaders(token),
+    );
+    const parsed = parseZai(status, body);
+    logHttp({
+      status: parsed.status,
+      error: parsed.error,
+      httpStatus: status,
+      body: parsed.status === "error" ? body : undefined,
+    });
+    return parsed;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "fetch failed";
+    const parsed = /abort/i.test(message)
+      ? { status: "error", error: "timeout" }
+      : { status: "error", error: message };
+    logHttp(parsed);
+    return parsed;
+  }
+}
+
 async function loadMetaProvider(
   connection: Connection,
   trigger: UsageTrigger,
@@ -189,7 +278,7 @@ async function setup(ctx: Plugin.Context) {
     trigger: UsageTrigger,
     signal?: AbortSignal,
   ): Promise<Snapshot> => {
-    const [grok, go, anthropic, meta, openai] = await Promise.all([
+    const [grok, go, zai, anthropic, meta, openai] = await Promise.all([
       loadProvider(
         connection,
         "xai",
@@ -206,6 +295,7 @@ async function setup(ctx: Plugin.Context) {
         trigger,
         signal,
       ),
+      loadZaiProvider(connection, trigger, signal),
       loadProvider(
         connection,
         "anthropic",
@@ -234,6 +324,7 @@ async function setup(ctx: Plugin.Context) {
         fetchedAt: new Date().toISOString(),
         grok: mergeProvider(prev?.grok, grok),
         go: mergeProvider(prev?.go, go),
+        zai: mergeProvider(prev?.zai, zai),
         anthropic: mergeProvider(prev?.anthropic, anthropic),
         meta: mergeProvider(prev?.meta, meta),
         openai: mergeProvider(prev?.openai, openai),

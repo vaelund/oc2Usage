@@ -8,6 +8,27 @@ export const ANTHROPIC_USAGE_URL = "https://api.anthropic.com/api/oauth/usage";
 export const META_RESPONSES_URL = "https://api.meta.ai/v1/responses";
 export const META_PROBE_MODEL = "muse-spark-1.3";
 export const OPENAI_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
+export const ZAI_QUOTA_PATH = "/api/monitor/usage/quota/limit";
+
+export type ZaiPlatform = "global" | "cn";
+
+export const ZAI_QUOTA_HOST: Record<ZaiPlatform, string> = {
+  global: "api.z.ai",
+  cn: "open.bigmodel.cn",
+};
+
+export function zaiQuotaUrl(platform: ZaiPlatform): string {
+  return `https://${ZAI_QUOTA_HOST[platform]}${ZAI_QUOTA_PATH}`;
+}
+
+/**
+ * Z.ai's monitoring API takes the raw key in `Authorization` with no `Bearer`
+ * prefix. `fetchJson` spreads extra headers after its default, so returning
+ * `Authorization` here overrides the bearer form.
+ */
+export function zaiRequestHeaders(token: string): Record<string, string> {
+  return { Authorization: token, "Accept-Language": "en-US,en" };
+}
 export const OPENAI_SESSION_WINDOW_SECONDS = 18_000;
 export const OPENAI_WEEKLY_WINDOW_SECONDS = 604_800;
 export const ANTHROPIC_OAUTH_HEADERS = {
@@ -107,6 +128,95 @@ export function parseGo(status: number, body: unknown): ProviderInfo {
     percent: picked?.percent,
     resetsAt: picked?.resetsAt,
     label: monthly ? "30d" : weekly ? "7d" : "5h",
+  };
+}
+
+/** Epoch seconds or milliseconds (Z.ai has used both) → ISO string. */
+function epochIso(value: unknown): string | undefined {
+  if (typeof value === "string" && !/^\d+$/.test(value.trim())) return value;
+  const n = asFloat(value);
+  if (n === undefined || n <= 0) return asString(value);
+  const ms = n < 1e12 ? n * 1000 : n;
+  return new Date(ms).toISOString();
+}
+
+function zaiWindow(value: unknown): WindowInfo | undefined {
+  const rec = asRecord(value);
+  if (!rec) return undefined;
+  const percent = asFloat(rec.percentage);
+  const resetsAt = epochIso(rec.nextResetTime);
+  if (percent === undefined && !resetsAt) return undefined;
+  const window: WindowInfo = { status: "ok" };
+  if (percent !== undefined) window.percent = percent;
+  if (resetsAt) window.resetsAt = resetsAt;
+  return window;
+}
+
+/**
+ * Parse `GET /api/monitor/usage/quota/limit` on api.z.ai (global) or
+ * open.bigmodel.cn (CN). The response is wrapped in `{ code, msg, success,
+ * data }`; `data.limits[]` identifies windows by `type`/`unit`/`number`:
+ * token limits with unit 3 number 5 are the 5-hour window, unit 6 number 1
+ * the weekly window, and `TIME_LIMIT` the monthly MCP tool allowance.
+ */
+export function parseZai(status: number, body: unknown): ProviderInfo {
+  if (status === 401 || status === 403)
+    return { status: "error", error: "unauthorized" };
+  if (status === 429) return { status: "rate-limited", error: "rate limited" };
+  if (status < 200 || status >= 300) {
+    return { status: "error", error: `HTTP ${status}` };
+  }
+  const root = asRecord(body);
+  if (!root) return { status: "error", error: "unrecognized payload" };
+  const code = asInt(root.code);
+  if (root.success === false || (code !== undefined && code !== 200)) {
+    const msg = asString(root.msg);
+    return {
+      status: "error",
+      error: msg
+        ? `Z.ai API error: ${msg}`
+        : `Z.ai API error (code ${String(root.code)})`,
+    };
+  }
+  const data = asRecord(root.data) ?? root;
+  const limits = Array.isArray(data.limits)
+    ? data.limits
+        .map((entry) => asRecord(entry))
+        .filter((entry): entry is Json => entry !== undefined)
+    : [];
+  const isTokenLimit = (limit: Json) =>
+    limit.type === "TOKENS_LIMIT" || limit.type === "CREDIT_LIMIT";
+  const rolling = zaiWindow(
+    limits.find(
+      (limit) =>
+        isTokenLimit(limit) &&
+        asInt(limit.unit) === 3 &&
+        asInt(limit.number) === 5,
+    ),
+  );
+  const weekly = zaiWindow(
+    limits.find(
+      (limit) =>
+        isTokenLimit(limit) &&
+        asInt(limit.unit) === 6 &&
+        asInt(limit.number) === 1,
+    ),
+  );
+  const monthly = zaiWindow(
+    limits.find((limit) => limit.type === "TIME_LIMIT"),
+  );
+  const picked = rolling ?? weekly ?? monthly;
+  if (!picked || typeof picked.percent !== "number")
+    return { status: "error", error: "no quota windows in payload" };
+  return {
+    status: "ok",
+    rolling,
+    weekly,
+    monthly,
+    percent: picked.percent,
+    resetsAt: picked.resetsAt,
+    label: rolling ? "5h" : weekly ? "week" : "mcp",
+    product: "Z.ai",
   };
 }
 

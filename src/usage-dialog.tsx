@@ -23,11 +23,15 @@ import {
   type ProviderInfo,
   type Snapshot,
   type WindowLabels,
+  ZAI_WINDOW_LABELS,
 } from "./format.ts";
 import { Usage } from "./rpc.ts";
 
 type Card = {
-  key: keyof Pick<Snapshot, "grok" | "go" | "anthropic" | "meta" | "openai">;
+  key: keyof Pick<
+    Snapshot,
+    "grok" | "go" | "zai" | "anthropic" | "meta" | "openai"
+  >;
   name: string;
   labels: WindowLabels;
 };
@@ -35,6 +39,7 @@ type Card = {
 const CARDS: Card[] = [
   { key: "grok", name: "Grok", labels: GROK_WINDOW_LABELS },
   { key: "go", name: "OpenCode Go", labels: GO_WINDOW_LABELS },
+  { key: "zai", name: "Z.ai", labels: ZAI_WINDOW_LABELS },
   { key: "anthropic", name: "Anthropic", labels: ANTHROPIC_WINDOW_LABELS },
   { key: "meta", name: "Meta", labels: META_WINDOW_LABELS },
   { key: "openai", name: "OpenAI", labels: OPENAI_WINDOW_LABELS },
@@ -98,6 +103,7 @@ export function UsageDialog() {
       draft.fetchedAt = next.fetchedAt || draft.fetchedAt;
       draft.grok = mergeProvider(draft.grok, next.grok);
       draft.go = mergeProvider(draft.go, next.go);
+      draft.zai = mergeProvider(draft.zai, next.zai);
       draft.anthropic = mergeProvider(draft.anthropic, next.anthropic);
       draft.meta = mergeProvider(draft.meta, next.meta);
       draft.openai = mergeProvider(draft.openai, next.openai);

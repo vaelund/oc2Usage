@@ -36,6 +36,7 @@ export default Plugin.define({
         draft.fetchedAt = next.fetchedAt || draft.fetchedAt;
         draft.grok = mergeProvider(draft.grok, next.grok);
         draft.go = mergeProvider(draft.go, next.go);
+        draft.zai = mergeProvider(draft.zai, next.zai);
         draft.anthropic = mergeProvider(draft.anthropic, next.anthropic);
         draft.meta = mergeProvider(draft.meta, next.meta);
         draft.openai = mergeProvider(draft.openai, next.openai);

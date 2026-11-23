@@ -28,6 +28,7 @@ export type Snapshot = {
   fetchedAt: string;
   grok: ProviderInfo;
   go: ProviderInfo;
+  zai: ProviderInfo;
   anthropic: ProviderInfo;
   meta: ProviderInfo;
   openai: ProviderInfo;
@@ -56,6 +57,12 @@ export const GO_WINDOW_LABELS: WindowLabels = {
   rolling: "5h",
   weekly: "week",
   monthly: "month",
+};
+
+export const ZAI_WINDOW_LABELS: WindowLabels = {
+  rolling: "5h",
+  weekly: "week",
+  monthly: "mcp",
 };
 
 export const ANTHROPIC_WINDOW_LABELS: WindowLabels = {
@@ -106,6 +113,7 @@ const DAY_MS = 86_400_000;
 const FOOTER_KIND = {
   grok: { name: "grok", labels: GROK_WINDOW_LABELS },
   go: { name: "go", labels: GO_WINDOW_LABELS },
+  zai: { name: "zai", labels: ZAI_WINDOW_LABELS },
   anthropic: { name: "claude", labels: ANTHROPIC_WINDOW_LABELS },
   meta: { name: "meta", labels: META_WINDOW_LABELS },
   openai: { name: "openai", labels: OPENAI_WINDOW_LABELS },
@@ -193,6 +201,7 @@ export function emptySnapshot(): Snapshot {
     fetchedAt: "",
     grok: { status: "pending" },
     go: { status: "pending" },
+    zai: { status: "pending" },
     anthropic: { status: "pending" },
     meta: { status: "pending" },
     openai: { status: "pending" },
@@ -487,6 +496,8 @@ export function formatCompact(snapshot: Snapshot): string {
 
   const go = chip("go", snapshot.go);
   if (go) parts.push(go);
+  const zai = chip("zai", snapshot.zai ?? { status: "pending" });
+  if (zai) parts.push(zai);
   const claude = chip("claude", snapshot.anthropic);
   if (claude) parts.push(claude);
   const meta = chip("meta", snapshot.meta ?? { status: "pending" });
@@ -499,7 +510,7 @@ export function formatCompact(snapshot: Snapshot): string {
 
 export function usageKindFromProviderID(
   providerID: string | undefined,
-): "grok" | "go" | "anthropic" | "meta" | "openai" | undefined {
+): "grok" | "go" | "zai" | "anthropic" | "meta" | "openai" | undefined {
   if (!providerID) return undefined;
   const id = providerID.toLowerCase();
   if (id === "meta" || id.startsWith("meta/") || id.includes("muse"))
@@ -512,6 +523,13 @@ export function usageKindFromProviderID(
     /(^|[-/])go$/.test(id)
   )
     return "go";
+  if (
+    id === "zai" ||
+    id.startsWith("zai-") ||
+    id.startsWith("zai/") ||
+    id.includes("zhipu")
+  )
+    return "zai";
   if (
     id === "anthropic" ||
     id.startsWith("anthropic/") ||
@@ -605,6 +623,7 @@ export function asSnapshot(value: unknown): Snapshot {
     fetchedAt: typeof rec.fetchedAt === "string" ? rec.fetchedAt : "",
     grok: rec.grok,
     go: rec.go,
+    zai: rec.zai ?? { status: "pending" },
     anthropic: withLegacyScoped(rec.anthropic ?? { status: "pending" }),
     meta: rec.meta ?? { status: "pending" },
     openai: rec.openai ?? { status: "pending" },
@@ -648,6 +667,7 @@ export function formatDetail(
 
   block("Grok", snapshot.grok, GROK_WINDOW_LABELS);
   block("OpenCode Go", snapshot.go, GO_WINDOW_LABELS);
+  block("Z.ai", snapshot.zai ?? { status: "pending" }, ZAI_WINDOW_LABELS);
   const anthropic = snapshot.anthropic ?? { status: "pending" };
   block("Anthropic", anthropic, ANTHROPIC_WINDOW_LABELS);
   if (isPayg("anthropic", anthropic)) lines.push(`Anthropic  ${PAYG_MESSAGE}`);
