@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Z.ai GLM Coding Plan usage: 5h + weekly token windows and the monthly MCP tool allowance from `GET /api/monitor/usage/quota/limit` (api.z.ai for `zai*` connections, open.bigmodel.cn for `zhipuai*`; `ZHIPU_API_KEY`/`ZAI_API_KEY` fallback)
+- Z.ai footer chip shows `peak` / `off-peak` based on the documented Mon–Fri 14:00–18:00 SGT peak window
 
 ## 26.9.1
 

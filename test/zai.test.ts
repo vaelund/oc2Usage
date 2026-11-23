@@ -5,6 +5,8 @@ import {
   formatCompact,
   formatDetail,
   formatFooter,
+  footerView,
+  isZaiPeak,
   providerWindows,
   usageKindFromProviderID,
   ZAI_WINDOW_LABELS,
@@ -155,8 +157,34 @@ describe("zai footer / snapshot", () => {
     expect(usageKindFromProviderID("zai-coding-plan/glm-5.3")).toBe("zai");
   });
 
-  test("footer shows percents", () => {
-    expect(formatFooter(snap, "zai", NOW)).toBe("zai 13/34/50%");
+  test("footer shows percents and off-peak note", () => {
+    expect(formatFooter(snap, "zai", NOW)).toBe("zai 13/34/50% · off-peak");
+  });
+
+  test("isZaiPeak uses Mon–Fri 14:00–18:00 SGT", () => {
+    // 06:00 UTC = 14:00 SGT.
+    expect(isZaiPeak(Date.UTC(2026, 10, 23, 6, 0))).toBe(true); // Monday
+    expect(isZaiPeak(Date.UTC(2026, 10, 23, 9, 59))).toBe(true); // 17:59 SGT
+    expect(isZaiPeak(Date.UTC(2026, 10, 23, 10, 0))).toBe(false); // 18:00 SGT
+    expect(isZaiPeak(Date.UTC(2026, 10, 23, 5, 59))).toBe(false); // 13:59 SGT
+    expect(isZaiPeak(Date.UTC(2026, 10, 27, 6, 0))).toBe(true); // Friday
+    expect(isZaiPeak(Date.UTC(2026, 10, 28, 6, 0))).toBe(false); // Saturday
+    expect(isZaiPeak(Date.UTC(2026, 10, 29, 6, 0))).toBe(false); // Sunday
+  });
+
+  test("footer marks peak during SGT peak hours", () => {
+    const peak = Date.UTC(2026, 10, 23, 7, 0); // Monday 15:00 SGT
+    expect(formatFooter(snap, "zai", peak)).toBe("zai 13/34/50% · peak");
+    expect(footerView(snap, "zai", peak)?.note).toBe("peak");
+    expect(footerView(snap, "zai", NOW)?.note).toBe("off-peak");
+  });
+
+  test("peak note is zai-only", () => {
+    const peak = Date.UTC(2026, 10, 23, 7, 0);
+    expect(formatFooter(emptySnapshot(), "go", peak)).toBe("");
+    expect(
+      footerView({ ...emptySnapshot(), go: snap.zai }, "go", peak)?.note,
+    ).toBeUndefined();
   });
 
   test("compact lists zai", () => {

@@ -13,7 +13,7 @@ claude 8/28%
 claude ▄/6d▅ 80/60%
 claude payg
 grok 6d▁ 60%
-zai 13/34/50%
+zai 13/34/50% · off-peak
 meta 2/0%
 meta payg
 openai 12/38%
@@ -69,6 +69,8 @@ Then:
 ## Usage
 
 The footer chip shows **only the session's current provider**. Percents are joined with `/` in this order: 5h, week, month — e.g. `go 0/0/2%`, `claude 8/28%`. When the session is on Fable (or Fable weekly is present and the model is unknown), the Fable weekly cap is shown instead of the all-models week — e.g. `claude 8/54%`. The `/usage` dialog always shows all reported Anthropic windows under `Anthropic · Claude`.
+
+The Z.ai chip also shows whether the plan is in **peak** hours (Mon–Fri 14:00–18:00 Singapore time, UTC+8) or **off-peak** — e.g. `zai 13/34/50% · peak`. This is a clock-only reference, not extra quota data.
 
 Unlabeled vertical blocks show **time remaining** until reset (`█` long wait → `▁` reset soon). The 5h block appears at **≥ 75%** used; the weekly block at **≥ 50%**. If both qualify they are joined with `/` — e.g. `claude ▄/6d▅ 80/60%`. The 5h block scales to its window (about 37.5 minutes per step); multi-day blocks show whole days plus an hourly block (`6d▅` = 6 days + ~12h, bare `▅` when under a day).
 

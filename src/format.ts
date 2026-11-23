@@ -86,6 +86,16 @@ export const OPENAI_WINDOW_LABELS: WindowLabels = {
   monthly: "month",
 };
 
+/** Z.ai peak hours: Monday–Friday 14:00–18:00 Singapore time (UTC+8, no DST). */
+const SGT_OFFSET_MS = 8 * 60 * 60 * 1000;
+
+export function isZaiPeak(now = Date.now()): boolean {
+  const sgt = new Date(now + SGT_OFFSET_MS);
+  const weekday = sgt.getUTCDay();
+  const hour = sgt.getUTCHours();
+  return weekday >= 1 && weekday <= 5 && hour >= 14 && hour < 18;
+}
+
 export const MIN_FETCH_INTERVAL_MS = 180_000;
 export const HOURLY_BLOCK_MIN_PERCENT = 75;
 export const WEEKLY_BLOCK_MIN_PERCENT = 50;
@@ -105,6 +115,8 @@ export type FooterView = {
   pies: FooterPie[];
   failed: boolean;
   maxPercent?: number;
+  /** Extra muted label, e.g. Z.ai peak / off-peak. */
+  note?: string;
 };
 
 const HOUR_MS = 3_600_000;
@@ -583,12 +595,15 @@ export function footerView(
     }
     return undefined;
   }
+  const note =
+    kind === "zai" ? (isZaiPeak(now) ? "peak" : "off-peak") : undefined;
   return {
     name: mapped.name,
     percents,
     pies: footerPies(provider, mapped.labels, now, modelID),
     failed: isFailed(provider) && percents === "!",
     maxPercent: maxWindowPercent(provider, mapped.labels, modelID),
+    ...(note && { note }),
   };
 }
 
@@ -603,7 +618,8 @@ export function formatFooter(
   const pies = view.pies.map((pie) => pie.glyph).join("/");
   const usage = view.percents === "!" ? "!" : view.percents;
   const core = pies ? `${view.name} ${pies} ${usage}` : `${view.name} ${usage}`;
-  return view.failed && view.percents !== "!" ? `${core} (!)` : core;
+  const noted = view.note ? `${core} · ${view.note}` : core;
+  return view.failed && view.percents !== "!" ? `${noted} (!)` : noted;
 }
 
 function withLegacyScoped(provider: ProviderInfo): ProviderInfo {

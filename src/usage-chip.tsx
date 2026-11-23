@@ -132,6 +132,11 @@ export function UsageChip(props: { sessionID?: string }) {
           >
             {item().percents === "!" ? "!" : item().percents}
           </text>
+          <Show when={item().note}>
+            <text fg={nameFg()} attributes={dimAttrs(true)} wrapMode="none">
+              {`· ${item().note}`}
+            </text>
+          </Show>
           <Show when={item().failed && item().percents !== "!"}>
             <text fg={muted() ? colors().muted : colors().crit} wrapMode="none">
               (!)
